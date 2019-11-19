@@ -46,5 +46,17 @@
 		<build.timestamp>${maven.build.timestamp}</build.timestamp>
 	</properties>
 
+	<distributionManagement>
+		<repository>
+			<id>internal</id>
+			<url>file://${project.basedir}/mvn-repo</url>
+		</repository>
+	</distributionManagement>
+
+	<scm>
+		<url>https://gitlab.fccn.pt/nau/nau-idp-auth</url>
+		<connection>scm:git:ssh://git@gitlab.fccn.pt:nau/nau-idp-auth.git</connection>
+		<developerConnection>scm:git:ssh://git@gitlab.fccn.pt:nau/nau-idp-auth.git</developerConnection>
+	</scm>
 </project>
 
