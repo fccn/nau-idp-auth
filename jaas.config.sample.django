@@ -1,0 +1,15 @@
+ShibUserPassAuth  {
+   pt.edu.nau.idp.auth.DBLogin required debug=true
+   dbDriver="com.mysql.jdbc.Driver"
+   dbURL="your_db_url"
+   dbUser="dbUserName"
+   dbPassword="dbPassword"
+   dbQuery="select CASE WHEN substring_index(password, '$', 1) = 'pbkdf2_sha256' THEN 'PBKDF2WithHmacSHA256' ELSE substring_index(password, '$', 1) END as algorithm, substring_index(substring_index(password, '$', 2), '$', -1) as iterations, substring_index(substring_index(password, '$', 3), '$', -1) as salt, 256 as keyLength, substring_index(password, '$', -1) as hash from auth_user where username=?"
+   algorithmPosition="1"
+   iterationCountPosition="2"
+   saltPosition="3"
+   keyLengthPosition="4"
+   passwordPosition="5"
+   encodePasswordBase64="true"
+   errorMessage="Invalid password";
+};

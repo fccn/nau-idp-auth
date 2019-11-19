@@ -8,10 +8,9 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -25,6 +24,12 @@ import javax.security.auth.login.FailedLoginException;
 import javax.security.auth.login.LoginException;
 import javax.security.auth.spi.LoginModule;
 
+/**
+ * Permits a database login using Java JAAS.
+ *
+ * @author Ivo Branco <ivo.branco@fccn.pt>
+ *
+ */
 public class DBLogin implements LoginModule {
 
 	// initial state
@@ -39,11 +44,27 @@ public class DBLogin implements LoginModule {
 	// the authentication status
 	protected boolean commitSucceeded = false;
 
+	//
+	// options
+	//
+	// required option
 	protected String dbDriver;
+	// required option
 	protected String dbURL;
 	protected String dbUser;
 	protected String dbPassword;
+
+	// required option
 	protected String dbQuery;
+
+	protected int passwordPosition;
+	protected String fixedAlgorithm;
+	protected int algorithmPosition;
+	protected int saltPosition;
+	protected int iterationCountPosition;
+	protected int keyLengthPosition; // 32 * 8
+	protected boolean encodePasswordBase64;
+
 	// select password from aut_user where username = ?;
 
 	// select * from (select substring_index(password, '$', 1) as alg,
@@ -54,22 +75,40 @@ public class DBLogin implements LoginModule {
 	@Override
 	public void initialize(Subject subject, CallbackHandler callbackHandler, Map<String, ?> sharedState,
 			Map<String, ?> options) {
+		this.subject = subject;
 		this.callbackHandler = callbackHandler;
+		this.sharedState = sharedState;
+		this.options = options;
 
 		dbDriver = getOption("dbDriver", null);
-		if (dbDriver == null)
+		if (dbDriver == null) {
 			throw new Error("No database driver named (dbDriver=?)");
+		}
 		dbURL = getOption("dbURL", null);
-		if (dbURL == null)
+		if (dbURL == null) {
 			throw new Error("No database URL specified (dbURL=?)");
+		}
 		dbUser = getOption("dbUser", null);
 		dbPassword = getOption("dbPassword", null);
-		if ((dbUser == null && dbPassword != null) || (dbUser != null && dbPassword == null))
+		if ((dbUser == null && dbPassword != null) || (dbUser != null && dbPassword == null)) {
 			throw new Error("Either provide dbUser and dbPassword or encode both in dbURL");
+		}
 
-		// get options like:
+		dbQuery = getOption("dbQuery", null);
+		if (dbQuery == null) {
+			throw new Error("No database query specified (dbQuery=?)");
+		}
 
-		// Object tmp = options.get("principalsQuery");
+		passwordPosition = getOption("passwordPosition", 0);
+		fixedAlgorithm = getOption("fixedAlgorithm", null);
+		algorithmPosition = getOption("algorithmPosition", -1);
+		if (fixedAlgorithm == null && algorithmPosition == -1) {
+			throw new Error("Either provide fixedAlgorithm or algorithmPosition");
+		}
+		saltPosition = getOption("saltPosition", -1);
+		iterationCountPosition = getOption("iterationCountPosition", -1);
+		keyLengthPosition = getOption("keyLengthPosition", -1);
+		encodePasswordBase64 = getOption("encodePasswordBase64", false);
 	}
 
 	@Override
@@ -134,25 +173,29 @@ public class DBLogin implements LoginModule {
 			if (!rsu.next())
 				throw new FailedLoginException("Unknown user");
 
-			String passwordDB = rsu.getString(1);
+			String passwordDB = rsu.getString(this.passwordPosition);
+			String algorithm = this.algorithmPosition >= 0 ? rsu.getString(this.algorithmPosition)
+					: this.fixedAlgorithm;
 
-			List<String> passwordDBArray = Arrays.asList(passwordDB.split("\\$"));
-			String algorithm = passwordDBArray.get(0);
+			byte[] salt = this.saltPosition >= 0 ? rsu.getBytes(this.saltPosition) : null;
 
-			if (!algorithm.equals("pbkdf2_sha256")) {
-				throw new LoginException("Error algorithm doesn't match");
+			Integer iterationCount = this.iterationCountPosition >= 0 ? rsu.getInt(this.iterationCountPosition) : null;
+
+			Integer keyLength = this.keyLengthPosition >= 0 ? rsu.getInt(this.keyLengthPosition) : null;
+
+			byte[] encryptedPassword = getEncryptedPassword(password, algorithm, salt, iterationCount, keyLength);
+
+			String encryptedPasswordAsString;
+			if (this.encodePasswordBase64) {
+				encryptedPasswordAsString = Base64.getEncoder().encodeToString(encryptedPassword);
+			} else {
+				encryptedPasswordAsString = new String(encryptedPassword);
 			}
 
-			int iterations = Integer.valueOf(passwordDBArray.get(1));
-			byte[] salt = passwordDBArray.get(2).getBytes();
-			String passwordHashedOnDB = passwordDBArray.get(3);
-
-			byte[] encryptedPassword = getEncryptedPassword(password, salt, iterations, 32);
-			String encryptedPasswordAsString = Base64.getEncoder().encodeToString(encryptedPassword);
-
-			if (!passwordHashedOnDB.equals(encryptedPasswordAsString)) {
+			if (!passwordDB.equals(encryptedPasswordAsString)) {
 				throw new FailedLoginException("Bad password");
 			}
+
 			return true;
 		} catch (ClassNotFoundException e) {
 			throw new LoginException("Error reading user database (" + e.getMessage() + ")");
@@ -195,15 +238,29 @@ public class DBLogin implements LoginModule {
 	}
 
 	/**
-	 * Get a String option from the module's options.
+	 * Get an option from the module's options as String, Integer or Boolean. If
+	 * default value is null return as String.
 	 *
 	 * @param name Name of the option
 	 * @param dflt Default value for the option
-	 * @return The String value of the options object.
+	 * @return The value of the options object.
 	 */
-	protected String getOption(String name, String dflt) {
-		String opt = (String) options.get(name);
-		return opt == null ? dflt : opt;
+	protected <T> T getOption(String name, T dflt) {
+		String opt = (String) this.options.get(name);
+		return Optional.ofNullable(opt).map(o -> {
+			if (dflt == null) {
+				return o;
+			} else if (String.class.isAssignableFrom(dflt.getClass())) {
+				return o;
+			} else if (Integer.class.isAssignableFrom(dflt.getClass())) {
+				return Integer.valueOf(o);
+			} else if (Boolean.class.isAssignableFrom(dflt.getClass())) {
+				return Boolean.valueOf(o);
+			}
+			throw new IllegalArgumentException("Invalid argument " + name);
+		}).map(o -> {
+			return (T) o;
+		}).orElse(dflt);
 	}
 
 	public static void smudge(char pwd[]) {
@@ -214,14 +271,21 @@ public class DBLogin implements LoginModule {
 		}
 	}
 
-	public static byte[] getEncryptedPassword(char[] password, byte[] salt, int iterations, int derivedKeyLength)
-			throws NoSuchAlgorithmException, InvalidKeySpecException {
-		KeySpec spec = new PBEKeySpec(password, salt, iterations, derivedKeyLength * 8);
+	public static byte[] getEncryptedPassword(char[] password, String algorithm, byte[] salt, Integer iterations,
+			Integer derivedKeyLength) throws NoSuchAlgorithmException, InvalidKeySpecException {
 
-		SecretKeyFactory f = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+		KeySpec spec;
+		if (derivedKeyLength != null) {
+			spec = new PBEKeySpec(password, salt, iterations, derivedKeyLength);
+		} else if (iterations != null) {
+			spec = new PBEKeySpec(password, salt, iterations);
+		} else {
+			spec = new PBEKeySpec(password);
+		}
+
+		SecretKeyFactory f = SecretKeyFactory.getInstance(algorithm);
 
 		return f.generateSecret(spec).getEncoded();
 	}
 
 }
-

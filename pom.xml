@@ -5,7 +5,7 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>pt.edu.nau.idp.auth</groupId>
-	<artifactId>db-login</artifactId>
+	<artifactId>nau-idp-auth</artifactId>
 	<version>1.0-SNAPSHOT</version>
 
 	<packaging>jar</packaging>
