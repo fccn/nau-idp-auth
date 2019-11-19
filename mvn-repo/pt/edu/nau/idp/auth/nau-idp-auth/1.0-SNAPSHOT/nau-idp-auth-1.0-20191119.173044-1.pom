@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>pt.edu.nau.idp.auth</groupId>
+	<artifactId>nau-idp-auth</artifactId>
+	<version>1.0-SNAPSHOT</version>
+
+	<packaging>jar</packaging>
+	<name>Database Login</name>
+	<description>
+		Contains a Java JAAS configuration that permits the Shibboleth IdP to authenticate users from a Django users database.
+	</description>
+	<inceptionYear>2019</inceptionYear>
+
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+			<comments>See LICENSE.txt for more information.</comments>
+		</license>
+	</licenses>
+	<organization>
+		<name>nau</name>
+		<url>https://www.nau.edu.pt/</url>
+	</organization>
+	<issueManagement>
+		<system>Github</system>
+		<url>https://gitlab.fccn.pt/nau/nau-idp-auth/issues</url>
+	</issueManagement>
+	<ciManagement>
+		<system>jenkins</system>
+		<url>https://jenkins.static.dev.nau.fccn.pt/</url>
+	</ciManagement>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+
+		<build.timestamp>${maven.build.timestamp}</build.timestamp>
+	</properties>
+
+	<distributionManagement>
+		<repository>
+			<id>internal</id>
+			<url>file://${project.basedir}/mvn-repo</url>
+		</repository>
+	</distributionManagement>
+
+	<scm>
+		<url>https://gitlab.fccn.pt/nau/nau-idp-auth</url>
+		<connection>scm:git:ssh://git@gitlab.fccn.pt:nau/nau-idp-auth.git</connection>
+		<developerConnection>scm:git:ssh://git@gitlab.fccn.pt:nau/nau-idp-auth.git</developerConnection>
+		<tag>HEAD</tag>
+	</scm>
+
+</project>
+

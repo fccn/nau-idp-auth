@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>pt.edu.nau.idp.auth</groupId>
+  <artifactId>nau-idp-auth</artifactId>
+  <versioning>
+    <versions>
+      <version>1.0-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20191119173044</lastUpdated>
+  </versioning>
+</metadata>
